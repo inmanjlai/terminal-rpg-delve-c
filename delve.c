@@ -4,6 +4,15 @@
 # include <stdbool.h>
 # include <string.h>
 
+///////////////////////////////////////////////////////////////////////////////////////////
+//                          DEFINING FUNDAMENTAL GAME STRUCTURES                         //
+///////////////////////////////////////////////////////////////////////////////////////////
+
+typedef struct {
+	int playerTurn;
+	int inCombat;
+} CombatManager;
+
 typedef struct {
 	int str;
 	int spd;
@@ -51,9 +60,13 @@ typedef struct {
 	Inventory inventory;
 } Enemy;
 
+///////////////////////////////////////////////////////////////////////////////////////////
+//                             INTIALIZING GAME RESOURCES                                //
+///////////////////////////////////////////////////////////////////////////////////////////
+
 Player player;
 Map map;
-bool inCombat;
+CombatManager combatManager;
 
 void createCharacter();
 void printInventory();
@@ -61,6 +74,13 @@ void printStats();
 void startGame();
 void nextRoom();
 void startBattle();
+void playerTurn();
+void enemyTurn();
+Enemy generateEnemy();
+
+///////////////////////////////////////////////////////////////////////////////////////////
+//                                       BEGIN GAME                                      //
+///////////////////////////////////////////////////////////////////////////////////////////
 
 int main() {
 	srand(time(NULL));
@@ -70,9 +90,8 @@ int main() {
 	startGame();
 
 	while (playing == true) {
-		if (inCombat) startBattle();
 		printf("What would you like to do now?\n");
-		// game loop here
+
 		char command[50];
 		scanf("%s", command);
 
@@ -89,6 +108,10 @@ int main() {
 
 	return 0;
 }
+
+///////////////////////////////////////////////////////////////////////////////////////////
+//                                  GAME HELPER FUNCTIONS                                //
+///////////////////////////////////////////////////////////////////////////////////////////
 
 void createCharacter() {
 	system("clear");
@@ -116,7 +139,15 @@ void printInventory() {
 }
 
 void printStats() {
-	printf("HP: %d / %d\n", player.currHp, player.maxHp);
+	system("clear");
+	printf("%s\n", player.name);
+	printf("---------- STATUS ----------\n");
+	printf("HP: ");
+	for(int i = 0; i <= player.currHp; i++) {
+		printf("*");
+	}
+	printf("\n");
+	printf("---------- STATS ----------\n");
 	printf("STR %d\n", player.str);
 	printf("SPD %d\n", player.spd);
 	printf("WIS %d\n", player.wis);
@@ -141,22 +172,61 @@ void nextRoom() {
 	player.currRoom = newRoom;
 	printf("You walked into a %s\n", roomChoice);
 	if (strcmp(player.currRoom.type, "shop") != 0) {
-		inCombat = true;
+		startBattle();
 	}
 }
+///////////////////////////////////////////////////////////////////////////////////////////
+//                             COMBAT SYSTEM FUNCTIONS                                   //
+///////////////////////////////////////////////////////////////////////////////////////////
 
-void startBattle() {
-	char command[50];
+Enemy generateEnemy() {
+	// generate enemy + enemy inventory
 	StatModifiers daggerStats = {1, 1, 0};
 	Item dagger = {"Dagger", "Allows for fast strikes, but doesn't deal much damage", 1, daggerStats};
 	Inventory goblinInventory;
 	goblinInventory.items[0] = dagger;
-	Enemy newEnemy = {"Goblin", 1, 2, 1, 6, 6, goblinInventory};
-	printf("You have engaged with %s\n", newEnemy.name);
-	while (inCombat) {
-		printf("Its your turn, choose your next action carefully\n");
-		scanf("%s", command);
-		printf("%s\n", command);
-		inCombat = false;
+	Enemy newEnemy = {"Goblin", 1, 1, 1, 6, 6, goblinInventory};
+
+	return newEnemy;
+}
+
+void startBattle() {
+	Enemy enemy = generateEnemy();
+	printf("You have engaged with %s\n", enemy.name);
+	// begin combat with generated enemy
+	combatManager.inCombat = 1;
+
+	// check for player speed vs enemy speed and set the correct turn
+	if (player.spd >= enemy.spd) combatManager.playerTurn = 1;
+
+	while (combatManager.inCombat) {
+		if (combatManager.playerTurn) playerTurn();
+		else enemyTurn();
 	}
 };
+
+void playerTurn() {
+	combatManager.playerTurn = 1;
+
+	char command[5];
+
+	printf("1: Attack\n2: Block\n3: Run\n4: Item\n");
+	scanf("%5s", command);
+
+	if (strcmp(command, "1") == 0) {
+		printf("Attack\n");
+	} else if (strcmp(command, "2") == 0) {
+		printf("Block\n");
+	} else if (strcmp(command, "3") == 0) {
+		combatManager.inCombat = 0;
+	} else if (strcmp(command, "4") == 0) {
+		printf("Item\n");
+	}  else {
+		printf("That is not a valid action\n");
+	}
+
+}
+
+void enemyTurn() {
+	combatManager.playerTurn = 0;
+}
