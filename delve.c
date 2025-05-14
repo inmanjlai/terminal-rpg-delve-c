@@ -9,11 +9,6 @@
 ///////////////////////////////////////////////////////////////////////////////////////////
 
 typedef struct {
-	int playerTurn;
-	int inCombat;
-} CombatManager;
-
-typedef struct {
 	int str;
 	int spd;
 	int wis;
@@ -37,6 +32,7 @@ typedef struct {
 
 typedef struct {
 	char name[50];
+	int armorClass;
 	int str;
 	int spd;
 	int wis;
@@ -52,6 +48,7 @@ typedef struct {
 
 typedef struct {
 	char name[50];
+	int armorClass;
 	int str;
 	int spd;
 	int wis;
@@ -59,6 +56,12 @@ typedef struct {
 	int maxHp;
 	Inventory inventory;
 } Enemy;
+
+typedef struct {
+	int playerTurn;
+	int inCombat;
+	Enemy currEnemy;
+} CombatManager;
 
 ///////////////////////////////////////////////////////////////////////////////////////////
 //                             INTIALIZING GAME RESOURCES                                //
@@ -77,6 +80,7 @@ void startBattle();
 void playerTurn();
 void enemyTurn();
 Enemy generateEnemy();
+void attack();
 
 ///////////////////////////////////////////////////////////////////////////////////////////
 //                                       BEGIN GAME                                      //
@@ -121,6 +125,7 @@ void createCharacter() {
 	printf("Welcome to the world of Delve, %s\n", player.name);
 	player.maxHp = 10;
 	player.currHp = 10;
+	player.armorClass = 12;
 	player.str = 1;
 	player.spd = 1;
 	player.wis = 1;
@@ -185,19 +190,19 @@ Enemy generateEnemy() {
 	Item dagger = {"Dagger", "Allows for fast strikes, but doesn't deal much damage", 1, daggerStats};
 	Inventory goblinInventory;
 	goblinInventory.items[0] = dagger;
-	Enemy newEnemy = {"Goblin", 1, 1, 1, 6, 6, goblinInventory};
+	Enemy newEnemy = {"Goblin", 10, 1, 1, 1, 6, 6, goblinInventory};
 
 	return newEnemy;
 }
 
 void startBattle() {
-	Enemy enemy = generateEnemy();
-	printf("You have engaged with %s\n", enemy.name);
+	combatManager.currEnemy = generateEnemy();
+	printf("You have engaged with %s\n", combatManager.currEnemy.name);
 	// begin combat with generated enemy
 	combatManager.inCombat = 1;
 
 	// check for player speed vs enemy speed and set the correct turn
-	if (player.spd >= enemy.spd) combatManager.playerTurn = 1;
+	if (player.spd >= combatManager.currEnemy.spd) combatManager.playerTurn = 1;
 
 	while (combatManager.inCombat) {
 		if (combatManager.playerTurn) playerTurn();
@@ -214,7 +219,7 @@ void playerTurn() {
 	scanf("%5s", command);
 
 	if (strcmp(command, "1") == 0) {
-		printf("Attack\n");
+		attack();
 	} else if (strcmp(command, "2") == 0) {
 		printf("Block\n");
 	} else if (strcmp(command, "3") == 0) {
@@ -229,4 +234,29 @@ void playerTurn() {
 
 void enemyTurn() {
 	combatManager.playerTurn = 0;
+}
+
+void attack() {
+	printf("You attacked %s\n", combatManager.currEnemy.name);
+	// roll a d20
+	int attackRoll = (rand() % 21);
+	int damageRoll = 0;
+	// if the result of the d20 is >= the enemy's armorClass then you landed a hit
+
+	if (attackRoll == 20) {
+		// if the attack roll is a 20, its a critical hit
+		damageRoll = (rand() % (player.str * 2 + 1));
+	} else if (attackRoll >= combatManager.currEnemy.armorClass) {
+		// roll a dice with the max value being the player's str stat
+		damageRoll = (rand() % (player.str + 1));
+	}
+
+	printf("You dealt %d damage\n", damageRoll);
+	// deal damage to the enemy bsaed on the damageRoll calculated above
+	combatManager.currEnemy.currHp -= damageRoll;
+		if (combatManager.currEnemy.currHp >= 0) {
+			// do enemy death logic here (show item drops, exp gained etc)
+			printf("You defeated %s\n", combatManager.currEnemy.name);
+			combatManager.inCombat = 0;
+		}
 }
