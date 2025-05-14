@@ -8,6 +8,10 @@
 //                          DEFINING FUNDAMENTAL GAME STRUCTURES                         //
 ///////////////////////////////////////////////////////////////////////////////////////////
 
+#define logSize 5
+int logIndex = 0;
+int playing;
+
 typedef struct {
 	int str;
 	int spd;
@@ -61,6 +65,7 @@ typedef struct {
 	int playerTurn;
 	int inCombat;
 	Enemy currEnemy;
+	char combatLog[logSize][100];
 } CombatManager;
 
 ///////////////////////////////////////////////////////////////////////////////////////////
@@ -81,6 +86,9 @@ void playerTurn();
 void enemyTurn();
 Enemy generateEnemy();
 void attack();
+void addLog();
+void drawUi();
+void drawMainUi();
 
 ///////////////////////////////////////////////////////////////////////////////////////////
 //                                       BEGIN GAME                                      //
@@ -89,24 +97,24 @@ void attack();
 int main() {
 	srand(time(NULL));
 	createCharacter();
-	bool playing = true;
+	playing = 1;
 
 	startGame();
 
-	while (playing == true) {
-		printf("What would you like to do now?\n");
+	while (playing) {
+		drawMainUi();
 
 		char command[50];
 		scanf("%s", command);
 
-		if (strcmp(command, "i") == 0) {
+		if (strcmp(command, "1") == 0) {
 			printInventory();
-		} else if (strcmp(command, "s") == 0) {
+		} else if (strcmp(command, "2") == 0) {
 			printStats();
-		} else if (strcmp(command, "q") == 0) {
-			playing = false;
-		} else if (strcmp(command, "m") == 0) {
+		} else if (strcmp(command, "3") == 0) {
 			nextRoom();
+		} else if (strcmp(command, "4") == 0) {
+			playing = 0;
 		}
 	}
 
@@ -117,11 +125,50 @@ int main() {
 //                                  GAME HELPER FUNCTIONS                                //
 ///////////////////////////////////////////////////////////////////////////////////////////
 
+void drawMainUi() {
+    system("clear"); // Optional: clear screen for clean redraw
+
+    // Top info
+    printf("=== The Dungeon ===\n");
+    printf("HP: %d\n", player.currHp);
+    printf("------------------------------\n");
+
+    // Horizontal action menu
+    printf("1: Inventory  2: Status  3: Move  4: Quit\n");
+
+    // Optional: Display recent log line
+    if (logIndex > 0) {
+        printf("\nLast message: %s\n", combatManager.combatLog[logIndex - 1]);
+    }
+
+    printf("\nChoose an action: ");
+}
+
+void drawUi() {
+    system("clear");  // Clear screen each time
+
+    printf("========================\n");
+    printf("      COMBAT STATUS     \n");
+    printf("========================\n");
+    printf("Your HP: %d/%d      %s HP: %d/%d\n", player.currHp, player.maxHp, combatManager.currEnemy.name, combatManager.currEnemy.currHp, combatManager.currEnemy.maxHp);
+    printf("\n");
+
+    printf("-- Combat Log --\n");
+    for (int i = 0; i < logIndex; ++i) {
+        printf("%s\n", combatManager.combatLog[i]);
+    }
+    printf("\n");
+
+    printf("------------------------\n");
+    printf("1: Attack  2: Block  3: Run  4: Item\n");
+    printf("Choose an action: ");
+}
+
 void createCharacter() {
 	system("clear");
 	printf("You wake up in a strange place... You don't remember much\n");
 	printf("What's your name? ");
-	fgets(player.name, sizeof(player.name), stdin);
+	scanf("%s50", player.name);
 	printf("Welcome to the world of Delve, %s\n", player.name);
 	player.maxHp = 10;
 	player.currHp = 10;
@@ -135,11 +182,13 @@ void createCharacter() {
 }
 
 void printInventory() {
-	if (player.inventory.inventoryCount == 0) printf("Your inventory is empty\n");
+	system("clear");
+	if (player.inventory.inventoryCount == 0) printf("Your inventory is empty\n\n");
 	else {
 		for (int i = 0; i < player.inventory.inventoryCount; i++){
 			printf("%s\n", player.inventory.items[i]);
 		}
+		printf("\n");
 	}
 }
 
@@ -155,7 +204,7 @@ void printStats() {
 	printf("---------- STATS ----------\n");
 	printf("STR %d\n", player.str);
 	printf("SPD %d\n", player.spd);
-	printf("WIS %d\n", player.wis);
+	printf("WIS %d\n\n", player.wis);
 }
 
 void startGame() {
@@ -196,8 +245,11 @@ Enemy generateEnemy() {
 }
 
 void startBattle() {
+	drawUi();
 	combatManager.currEnemy = generateEnemy();
-	printf("You have engaged with %s\n", combatManager.currEnemy.name);
+        char msg[100];
+        snprintf(msg, sizeof(msg), "You encountered %s", combatManager.currEnemy.name);
+        addLog(msg);
 	// begin combat with generated enemy
 	combatManager.inCombat = 1;
 
@@ -213,31 +265,49 @@ void startBattle() {
 void playerTurn() {
 	combatManager.playerTurn = 1;
 
-	char command[5];
+	drawUi();
 
-	printf("1: Attack\n2: Block\n3: Run\n4: Item\n");
+	char command[5];
 	scanf("%5s", command);
 
 	if (strcmp(command, "1") == 0) {
 		attack();
 	} else if (strcmp(command, "2") == 0) {
-		printf("Block\n");
+		addLog("You brace for an attack");
 	} else if (strcmp(command, "3") == 0) {
+		addLog("You flee");
 		combatManager.inCombat = 0;
 	} else if (strcmp(command, "4") == 0) {
-		printf("Item\n");
+		addLog("You fumble for an item");
 	}  else {
-		printf("That is not a valid action\n");
+		printf("That is not a valid action\n\n");
 	}
 
 }
 
 void enemyTurn() {
 	combatManager.playerTurn = 0;
+
+	int attackRoll = (rand() % 21);
+	int damageRoll = 0;
+	if (attackRoll == 20) damageRoll = (rand() % combatManager.currEnemy.str * 2 + 1);
+	else if (attackRoll >= player.armorClass) damageRoll = (rand() % combatManager.currEnemy.str + 1);
+
+	char msg[100];
+	snprintf(msg, sizeof(msg), "%s attacked %s for %d damage", combatManager.currEnemy.name, player.name, damageRoll);
+	addLog(msg);
+
+	player.currHp -= damageRoll;
+	if (player.currHp <= 0) {
+		printf("You have died\n\n");
+		combatManager.inCombat = 0;
+		playing = false;
+	} else {
+		playerTurn();
+	}
 }
 
 void attack() {
-	printf("You attacked %s\n", combatManager.currEnemy.name);
 	// roll a d20
 	int attackRoll = (rand() % 21);
 	int damageRoll = 0;
@@ -250,13 +320,29 @@ void attack() {
 		// roll a dice with the max value being the player's str stat
 		damageRoll = (rand() % (player.str + 1));
 	}
-
-	printf("You dealt %d damage\n", damageRoll);
+	char msg[100];
+	snprintf(msg, sizeof(msg), "You attacked %s for %d damage", combatManager.currEnemy.name, damageRoll);
+	addLog(msg);
 	// deal damage to the enemy bsaed on the damageRoll calculated above
 	combatManager.currEnemy.currHp -= damageRoll;
-		if (combatManager.currEnemy.currHp >= 0) {
-			// do enemy death logic here (show item drops, exp gained etc)
-			printf("You defeated %s\n", combatManager.currEnemy.name);
-			combatManager.inCombat = 0;
-		}
+	if (combatManager.currEnemy.currHp <= 0) {
+		// do enemy death logic here (show item drops, exp gained etc)
+		char msg[100];
+		snprintf(msg, sizeof(msg), "You defeated %s", combatManager.currEnemy.name);
+		addLog(msg);
+		combatManager.inCombat = 0;
+	} else {
+		enemyTurn();
+	}
+}
+
+void addLog(const char *message) {
+    if (logIndex < logSize) {
+        snprintf(combatManager.combatLog[logIndex++], 100, "%s", message);
+    } else {
+        for (int i = 1; i < logSize; ++i) {
+            snprintf(combatManager.combatLog[i - 1], 100, "%s", combatManager.combatLog[i]);
+        }
+        snprintf(combatManager.combatLog[logSize - 1], 100, "%s", message);
+    }
 }
